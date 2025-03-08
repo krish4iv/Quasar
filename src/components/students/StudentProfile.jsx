@@ -1,52 +1,89 @@
-import { useState } from "react";
-import { useAuth } from "../../contexts/AuthContext";
+import { useState, useEffect } from "react";
+import InstitutionDropdown from "../InstitutionDropdown";
+import fetchUUID from "../../components/fetchUuid"; // Importing fetchUUID function
 
 const StudentProfileEditor = ({ onClose }) => {
-  const { currentUser, updateProfile } = useAuth();
   const [formData, setFormData] = useState({
-    firstName: currentUser?.firstName || "",
-    lastName: currentUser?.lastName || "",
-    dateOfBirth: currentUser?.dateOfBirth || "",
-    role: currentUser?.role || "",
-    institutionName: currentUser?.institutionName || "",
-    graduationYear: currentUser?.graduationYear || "",
-    bio: currentUser?.bio || "",
-    profileImage: currentUser?.profileImage || "",
+    uuid: "",
+    first_name: "",
+    last_name: "",
+    date_of_birth: "",
+    role: "student",
+    institution_name: "",
+    graduation_year: "",
+    is_premium: false,
+    bio: "",
+    skills: [],
+    linkedin_url: "",
+    location: "",
+    degree: "",
   });
-  const [selectedFile, setSelectedFile] = useState(null); // State to store the selected file
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }));
-  };
+  useEffect(() => {
+    const fetchAndSetUUID = async () => {
+      try {
+        const userId = await fetchUUID();
+        if (!userId) throw new Error("User ID not found");
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-
-      // Preview the selected image
-      const reader = new FileReader();
-      reader.onloadend = () => {
         setFormData((prevData) => ({
           ...prevData,
-          profileImage: reader.result, // Set the image URL in formData
+          uuid: userId,
         }));
-      };
-      reader.readAsDataURL(file);
-    }
+      } catch (error) {
+        console.error("Error fetching UUID:", error);
+      }
+    };
+
+    fetchAndSetUUID();
+  }, []);
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+
+    // console.log("Updated Form Data:", { ...formData, [name]: value });
+  };
+
+  const handleInstitutionChange = (selectedInstitution) => {
+    setFormData((prevData) => ({
+      ...prevData,
+      institution_name: selectedInstitution,
+    }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     try {
-      await updateProfile(formData); // Update the profile
-      onClose(); // Close the editor after saving
+      if (!formData.uuid) {
+        throw new Error("User ID (UUID) is required.");
+      }
+
+      const response = await fetch("http://192.168.23.55:8000/fquery/changeUser", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      console.log("Sending Data:", JSON.stringify(formData, null, 2));
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.message || "Failed to update user profile.");
+      }
+
+      const result = await response.json();
+      console.log("✅ Profile updated successfully!", result);
+      onClose();
     } catch (error) {
-      console.error("Failed to update profile:", error);
+      console.error("❌ Failed to update profile:", error.message);
+      alert(`Failed to update profile: ${error.message}`);
     }
   };
 
@@ -54,105 +91,74 @@ const StudentProfileEditor = ({ onClose }) => {
     <div className="bg-white shadow rounded-xl p-6">
       <h2 className="text-xl font-bold mb-4">Edit Profile</h2>
       <form onSubmit={handleSubmit}>
-        {/* Profile Photo Upload */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Profile Photo</label>
-          <div className="flex items-center gap-4">
-            <div className="h-24 w-24 rounded-full overflow-hidden">
-              <img
-                src={formData.profileImage || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-4.0.3&auto=format&fit=crop&w=256&q=80"}
-                alt="Profile"
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="w-full px-3 py-2 border rounded-xl"
-            />
-          </div>
-        </div>
-
-        {/* First Name */}
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">First Name</label>
           <input
             type="text"
-            name="firstName"
-            value={formData.firstName}
+            name="first_name"
+            value={formData.first_name}
             onChange={handleChange}
             className="w-full px-3 py-2 border rounded-xl"
             required
           />
         </div>
 
-        {/* Last Name */}
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Last Name</label>
           <input
             type="text"
-            name="lastName"
-            value={formData.lastName}
+            name="last_name"
+            value={formData.last_name}
             onChange={handleChange}
             className="w-full px-3 py-2 border rounded-xl"
             required
           />
         </div>
 
-        {/* Date of Birth */}
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Date of Birth</label>
           <input
             type="date"
-            name="dateOfBirth"
-            value={formData.dateOfBirth}
+            name="date_of_birth"
+            value={formData.date_of_birth}
             onChange={handleChange}
             className="w-full px-3 py-2 border rounded-xl"
-            required
           />
         </div>
 
-        {/* Role */}
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Role</label>
-          <input
-            type="text"
+          <select
             name="role"
             value={formData.role}
             onChange={handleChange}
             className="w-full px-3 py-2 border rounded-xl"
             required
-          />
+          >
+            <option value="student">Student</option>
+            <option value="alumni">Alumni</option>
+            <option value="admin">Admin</option>
+          </select>
         </div>
 
-        {/* Institution Name */}
+        {/* ✅ Institution Dropdown */}
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Institution Name</label>
-          <input
-            type="text"
-            name="institutionName"
-            value={formData.institutionName}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border rounded-xl"
-            required
-          />
+          <InstitutionDropdown value={formData.institution_name} onChange={handleInstitutionChange} />
         </div>
 
-        {/* Graduation Year */}
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Graduation Year</label>
           <input
             type="number"
-            name="graduationYear"
-            value={formData.graduationYear}
+            name="graduation_year"
+            value={formData.graduation_year}
             onChange={handleChange}
             className="w-full px-3 py-2 border rounded-xl"
-            required
           />
         </div>
 
-        {/* Bio */}
+        {/* ✅ Bio Section Added */}
         <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Bio</label>
           <textarea
@@ -160,24 +166,73 @@ const StudentProfileEditor = ({ onClose }) => {
             value={formData.bio}
             onChange={handleChange}
             className="w-full px-3 py-2 border rounded-xl"
+            placeholder="Tell us about yourself..."
             rows="4"
-            required
           />
         </div>
 
-        {/* Buttons */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-1">Skills</label>
+          <input
+            type="text"
+            name="skills"
+            value={formData.skills.join(", ")}
+            onChange={(e) => setFormData({ ...formData, skills: e.target.value.split(", ") })}
+            className="w-full px-3 py-2 border rounded-xl"
+            placeholder="Comma separated skills (e.g., React, Node.js, Python)"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-1">LinkedIn URL</label>
+          <input
+            type="url"
+            name="linkedin_url"
+            value={formData.linkedin_url}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border rounded-xl"
+            placeholder="https://www.linkedin.com/in/your-profile"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-1">Location</label>
+          <input
+            type="text"
+            name="location"
+            value={formData.location}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border rounded-xl"
+          />
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-1">Degree</label>
+          <input
+            type="text"
+            name="degree"
+            value={formData.degree}
+            onChange={handleChange}
+            className="w-full px-3 py-2 border rounded-xl"
+          />
+        </div>
+
+        <div className="mb-4 flex items-center">
+          <input
+            type="checkbox"
+            name="is_premium"
+            checked={formData.is_premium}
+            onChange={handleChange}
+            className="mr-2"
+          />
+          <label className="text-sm font-medium">Premium User</label>
+        </div>
+
         <div className="flex justify-end gap-4">
-          <button
-            type="button"
-            className="px-4 py-2 border rounded-xl hover:bg-gray-100"
-            onClick={onClose}
-          >
+          <button type="button" className="px-4 py-2 border rounded-xl hover:bg-gray-100" onClick={onClose}>
             Cancel
           </button>
-          <button
-            type="submit"
-            className="px-4 py-2 bg-[#C3A1FF] text-white rounded-xl hover:bg-[#a88be0]"
-          >
+          <button type="submit" className="px-4 py-2 bg-[#C3A1FF] text-white rounded-xl hover:bg-[#a88be0]">
             Save Changes
           </button>
         </div>

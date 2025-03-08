@@ -2,7 +2,7 @@ import { useState } from "react";
 import AnimatedSection from "../components/AnimatedSection";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Mail, Lock, User, Calendar, Building } from "lucide-react";
-import { useAuth } from "../contexts/AuthContext";
+import supabase from "../contexts/supabaseclient"; // Import the Supabase client
 
 const SignUp = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -16,7 +16,6 @@ const SignUp = () => {
     agreeTerms: false
   });
 
-  const { signup } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -34,23 +33,41 @@ const SignUp = () => {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (formData.agreeTerms) {
-      // Sign up the user
-      signup(formData);
-      
-      // Show success alert
-      alert(`Your ${formData.role} account has been created successfully.`);
-      
-      // Redirect to the appropriate dashboard
-      if (formData.role === "student") {
-        navigate('/dashboard/student');
-      } else if (formData.role === "alumni") {
-        navigate('/dashboard/alumni');
-      } else if (formData.role === "institute") {
-        navigate('/dashboard/institute');
+      try {
+        // Sign up the user with Supabase
+        const { user, error } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            data: {
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+              graduation_year: formData.graduationYear,
+              role: formData.role,
+              institute_name: formData.role === "institute" ? formData.instituteName : null
+            }
+          }
+        });
+
+        if (error) throw error;
+
+        // Show success alert
+        alert(`Your ${formData.role} account has been created successfully.`);
+        
+        // Redirect to the appropriate dashboard
+        if (formData.role === "student") {
+          navigate('/dashboard/student');
+        } else if (formData.role === "alumni") {
+          navigate('/dashboard/alumni');
+        } else if (formData.role === "institute") {
+          navigate('/dashboard/institute');
+        }
+      } catch (error) {
+        alert(error.message);
       }
     }
   };

@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { createContext, useContext, useState, useEffect } from "react";
+import supabase from "./supabaseclient"; // Import Supabase client
 
 const AuthContext = createContext();
 
@@ -10,36 +10,118 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is stored in localStorage
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setCurrentUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    const fetchSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        setCurrentUser(session?.user || null);
+      } catch (error) {
+        console.error("Error fetching session:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        setCurrentUser(session?.user || null);
+        setLoading(false);
+      }
+    );
+
+    return () => {
+      subscription?.unsubscribe(); // Correct method for unsubscribing
+    };
   }, []);
 
-  const login = (userData) => {
-    setCurrentUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
-    return userData;
+  const login = async (email, password) => {
+    try {
+      const { data: { user }, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      setCurrentUser(user);
+      return user;
+    } catch (error) {
+      console.error("Login error:", error);
+      throw error;
+    }
   };
 
-  const signup = (userData) => {
-    setCurrentUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
-    return userData;
+  const signup = async (email, password, role, additionalData = {}) => {
+    try {
+      const { data: { user }, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { role, ...additionalData },
+        },
+      });
+
+      if (error) throw error;
+
+      if (user) {
+        await supabase.auth.updateUser({ data: { role, ...additionalData } }); // Ensure role and additional data are stored
+        setCurrentUser(user);
+      }
+      return user;
+    } catch (error) {
+      console.error("Signup error:", error);
+      throw error;
+    }
   };
 
-  const logout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('user');
+  const logout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      setCurrentUser(null);
+    } catch (error) {
+      console.error("Logout error:", error);
+      throw error;
+    }
   };
 
-  const updateProfile = (updatedData) => {
-    // Merge the updated data with the current user data
-    const updatedUser = { ...currentUser, ...updatedData };
-    setCurrentUser(updatedUser);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
+  const uploadProfilePhoto = async (file) => {
+    if (!currentUser) {
+      console.error("No user found for profile upload");
+      return;
+    }
+
+    try {
+      const filePath = `profile-photos/${currentUser.id}/${file.name}`;
+
+      const { data, error } = await supabase.storage
+        .from("profile-photos")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (error) throw error;
+
+      const { data: publicData } = supabase.storage.from("profile-photos").getPublicUrl(filePath);
+      return publicData?.publicUrl || null; // Ensure valid return
+    } catch (error) {
+      console.error("Error uploading profile photo:", error);
+      throw error;
+    }
+  };
+
+  const updateProfile = async (updatedData) => {
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update(updatedData)
+        .eq("id", currentUser.id);
+
+      if (error) throw error;
+
+      setCurrentUser((prevUser) => ({ ...prevUser, ...updatedData }));
+    } catch (error) {
+      console.error("Update profile error:", error);
+      throw error;
+    }
   };
 
   const value = {
@@ -47,7 +129,8 @@ export const AuthProvider = ({ children }) => {
     login,
     signup,
     logout,
-    updateProfile, // Add updateProfile to the context value
+    updateProfile,
+    uploadProfilePhoto,
     loading,
   };
 
