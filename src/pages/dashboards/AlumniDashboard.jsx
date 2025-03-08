@@ -5,17 +5,24 @@ import AnimatedSection from "../../components/AnimatedSection";
 import { BriefcaseIcon, GraduationCapIcon, UsersIcon, MapPinIcon, MailIcon, BuildingIcon, NetworkIcon, CalendarIcon, MessageCircleIcon } from "lucide-react";
 import EventManagement from "../../components/alumni/EventsManagement";
 import ForumManagement from "../../components/alumni/FormManagement";
+import StreamChatComponent from "./StreamChat";
+
+
 
 const AlumniDashboard = () => {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("profile");
   const [activeProfileTab, setActiveProfileTab] = useState("experience");
+ 
 
   const handleLogout = () => {
     logout();
     navigate('/signin');
   };
+
+  
+    
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -33,6 +40,19 @@ const AlumniDashboard = () => {
       <AnimatedSection>
         <div className="bg-white rounded-xl shadow p-4 mb-6">
           <div className="flex flex-wrap gap-2">
+
+          <button 
+              className={`flex items-center px-4 py-2 rounded-xl ${
+                activeTab === "chats" 
+                  ? "bg-[#C3A1FF] text-white" 
+                  : "hover:bg-gray-100"
+              }`}
+              onClick={() => setActiveTab("chats")}
+            >
+              <UsersIcon className="mr-2 h-4 w-4" />
+              Messages
+            </button>
+
             <button 
               className={`flex items-center px-4 py-2 rounded-xl ${
                 activeTab === "profile" 
@@ -390,6 +410,22 @@ const AlumniDashboard = () => {
                 </div>
               </div>
             </AnimatedSection>
+          )}
+          {activeTab === "chats" && (
+            <AnimatedSection delay="200" className="mt-1">
+            <div>
+              <div className="h-64 w-full">
+                <StreamChatComponent 
+                  user={{
+                    id: "john",
+                    name: "John Doe",
+                    image: "https://getstream.imgix.net/images/random_svg/FS.png"
+                  }}
+                />
+              </div>
+            </div>
+          </AnimatedSection>
+          
           )}
         </div>
       </div>
